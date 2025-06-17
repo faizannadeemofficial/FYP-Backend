@@ -1,0 +1,45 @@
+========================================================================================================================================
+=========================================================== Class Prototype ============================================================
+========================================================================================================================================
+
+[x] text.TextProfanityFilter {
+    [x] Training text based model (Model is available in model directory)
+    [x] Filtering words from profane dictionary (Profane dictionary is available in text_profanity_filter.py file)
+    [x] Filtering custom words by user
+    [x] Custom mask character (Default is *)
+    [x] APIs
+}
+
+[x] audio.AudioProfanityFilter {
+    [x] Transcribe audio to text (using faster-whisper)
+    [x] Detect profanity (using TextProfanityFilter class in text_profanity_filter.py)
+    [x] Beep the detected profanity
+    [x] APIs
+}
+
+[x] image.ImageProfanityDetection {
+    [x] Setup CLIP model
+    [x] Passed an image to it
+    [x] Got all profanities list from the image
+    [x] Blur the whole image based on user choice
+    [x] APIs
+}
+
+[] video.VideoProfanityDetection {
+    [x] Take a frame from every second
+    [] Detect profanity (using Image Profanity Detection class)
+    [] Mask the video seconds from the duration of profane frames by bluring it based on user's choice
+    [] APIs
+}
+
+========================================================================================================================================
+=============================================================== Pocket Base ============================================================
+========================================================================================================================================
+
+PocketBase: imfaizannadeem@gmail.com
+PocketBase Password: F@db422dfadb422d
+
+
+
+Schema:
+
