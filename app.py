@@ -1,6 +1,7 @@
 import os
 import time
 from flask import Flask, request, jsonify
+from flask_cors import CORS
 from werkzeug.utils import secure_filename
 
 from text import TextProfanityFilter
@@ -9,6 +10,7 @@ from image import ImageProfanityFilter
 from video import VideoProfanityDetection
 
 app = Flask(__name__)
+CORS(app)
 
 tpf = TextProfanityFilter()  # Instance of TextProfanityFilter
 apf = AudioProfanityFilter(textpf=tpf)  # Instance of AudioProfanityFilter
@@ -191,7 +193,7 @@ def VideoModeration():
         vpf = VideoProfanityDetection(
             input_video=input_file_path,
             custom_words=words,
-            mask_char="😈"
+            mask_char=mask_char
         )
 
         return jsonify(
