@@ -106,6 +106,9 @@ class TextProfanityFilter:
             "may",
             "might",
             "must",
+            # Others
+            "man",
+            "fan",
         ]
 
         # All Bad Words
