@@ -3,13 +3,12 @@ from predict import ProfanityDetectionModel
 from faster_whisper import WhisperModel
 from pydub import AudioSegment
 
-tpf = TextProfanityFilter()  # Initializing badwords
-pdm = ProfanityDetectionModel()  # Initializing ML model
-
 
 class AudioProfanityFilter:
     def __init__(self, textpf):
         self.textpf = textpf
+        self.tpf = TextProfanityFilter()  # Initializing badwords
+        self.pdm = ProfanityDetectionModel()  # Initializing ML model
 
     def transcribeAndModerate(
         self, audio: str, custom_words: list, mask_char="*", model_size="tiny"
@@ -63,7 +62,7 @@ class AudioProfanityFilter:
     def audioProfanityFilteration(
         self,
         audio_path: str,
-        output_path: str,
+        output_file_name: str,
         mask_char: str,
         custom_words: list,
         beep_path=None,
@@ -101,6 +100,6 @@ class AudioProfanityFilter:
                 audio = audio[:start_ms] + adjusted_beep + audio[end_ms:]
 
         # Export censored audio
-        audio.export(output_path, format="wav")
+        audio.export(f"storage/files/" + output_file_name, format="wav")
 
-        return output_path, profanity_data
+        return output_file_name, profanity_data

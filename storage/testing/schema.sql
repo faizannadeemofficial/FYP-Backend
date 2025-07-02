@@ -5,7 +5,8 @@ create table users
     email_id    varchar(200),
     user_password varchar(200),
     auth_token  varchar(4000),
-    refresh_token varchar(4000)
+    refresh_token varchar(4000),
+    creation_date   date
 )
 
 create table input_contents
@@ -15,7 +16,8 @@ create table input_contents
     content_type        varchar(20),  -- TEXT, AUDIO, VIDEO , IMAGE
     input_content       varchar(4000),
     mask_character      varchar(50),             -- 😈
-    output_content      varchar(4000)
+    output_content      varchar(4000),
+    modification_date       datetime
 )
 
 create table custom_words
@@ -49,6 +51,8 @@ create table processed_audio
     start_time              bigint,
     end_time                bigint,
     is_flagged              varchar(5),         -- true  ,  false
+    original_word           varchar(100),
+    filtered_word           varchar(100)
 )
 
 create table processed_image
