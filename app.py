@@ -353,6 +353,20 @@ def AudioModeration():
 # Image Moderation Endpoint
 @app.route("/imgmoderation", methods=["POST"])
 def ImageModeration():
+    auth_token = request.headers.get(
+        "Authorization"
+    )  # Getting the auth token from the request header
+    if not auth_token:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    decoded_token = utils.verify_token(auth_token)  # Verifying the token
+    if decoded_token == "Token expired":
+        return jsonify({"error": "Token expired"}), 401
+    elif decoded_token == "Invalid token":
+        return jsonify({"error": "Invalid token"}), 401
+
+    user_id = decoded_token["user_id"]  # Getting the user id from the token
+
     try:
         # Check if image file is provided
         if "image" not in request.files:
@@ -384,7 +398,7 @@ def ImageModeration():
             )
 
         # Save uploaded image
-        filepath = os.path.join(app.config["UPLOAD_FOLDER"], filename)
+        filepath = os.path.join("storage/files/", filename)
         image_file.save(filepath)
 
         r = ipd.detect(image_path=filepath)  # Detecting profanity in image
@@ -396,7 +410,33 @@ def ImageModeration():
             blured_image_path  # Adding new key value pair in response
         )
 
-        return jsonify(r)
+        DaOPS = DatabaseOPS()
+        input_content_id = DaOPS.insert_input_content(
+            user_id=user_id,
+            content_type="IMAGE",
+            input_content=filepath,
+            mask_character="",
+            output_content=blured_image_path,
+        )
+
+        if input_content_id is not None:
+            for x in r["harmful_detected"]:
+                if DaOPS.insert_processed_image(
+                    input_content_id=input_content_id,
+                    detected_content=x,
+                    is_flagged=r["isFlagged"]
+                ) != 1:
+                    return jsonify({"error": "Internal server error while inserting data in processed image table"}), 500
+            
+            if DaOPS.insert_visual_content_features(
+                input_content_id=input_content_id,
+                blur_radius=str(blur_radius),
+                fps=0
+            ) != 1:
+                return jsonify({"error": "Internal server error while inseting data in insert_visual_content_features table"}), 500
+            return jsonify(r), 200
+        else:
+            return jsonify({"error": "Internal server error"}), 500
 
     except Exception as e:
         print("error: Processing error", str(e))

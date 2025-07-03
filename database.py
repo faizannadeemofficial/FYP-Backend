@@ -245,3 +245,32 @@ class DatabaseOPS:
             return 1
         except Exception as e:
             print(f"Error in inserting processed text is: {e}")
+
+    def insert_processed_image(
+        self,
+        input_content_id: str,
+        detected_content: str,
+        is_flagged: str,
+    ):
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute(
+                "INSERT INTO processed_image (input_content_id, detected_content, is_flagged) VALUES (%s, %s, %s)",
+                (input_content_id, detected_content, is_flagged),
+            )
+            self.conn.commit()
+            return 1
+        except Exception as e:
+            print(f"Error in inserting processed image is: {e}")
+
+    def insert_visual_content_features (self, input_content_id, blur_radius, fps):
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute(
+                "INSERT INTO visual_content_features (input_content_id, blur_radius, fps) VALUES (%s, %s, %s)",
+                (input_content_id, blur_radius, fps),
+            )
+            self.conn.commit()
+            return 1
+        except Exception as e:
+            print(f"Error in inserting insert_visual_content_features is: {e}")
