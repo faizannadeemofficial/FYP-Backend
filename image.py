@@ -36,8 +36,8 @@ class ImageProfanityFilter:
         blurred_image = image.filter(ImageFilter.GaussianBlur(radius=blur_radius))
 
         # Save the output
-        output_path = f"storage/files/{int(time.time())}.jpg"
-        blurred_image.save(output_path)
+        output_path = f"{int(time.time())}.jpg"
+        blurred_image.save("storage/files/"+output_path)
 
         return output_path
 

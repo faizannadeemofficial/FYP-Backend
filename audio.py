@@ -100,6 +100,6 @@ class AudioProfanityFilter:
                 audio = audio[:start_ms] + adjusted_beep + audio[end_ms:]
 
         # Export censored audio
-        audio.export(f"storage/files/" + output_file_name, format="wav")
+        audio.export("storage/files/" + output_file_name, format="wav")
 
         return output_file_name, profanity_data

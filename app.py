@@ -1,7 +1,7 @@
 import os
 import time
 import bcrypt
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, Response, abort, request, jsonify, send_file, send_from_directory
 from flask_cors import CORS
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -142,6 +142,8 @@ def login():
             )
             == 1
         ):
+            DaOPS.close()  # Close the database connection
+            # Return the auth token, refresh token, user id, user name and email
             return (
                 jsonify(
                     {
@@ -210,6 +212,44 @@ def logout():
         return jsonify({"error": "Error occured while logging out."})
 
 
+
+
+# Stream Media File
+@app.route('/stream/<path:filename>')
+def stream_file(filename):
+    file_path = os.path.join("storage/files", filename)
+    if not os.path.exists(file_path):
+        return abort(404)
+
+    range_header = request.headers.get('Range', None)
+    if not range_header:
+        return send_file(file_path)
+
+    # Handle partial content (video/audio seeking)
+    try:
+        size = os.path.getsize(file_path)
+        byte1, byte2 = 0, None
+
+        match = range_header.replace('bytes=', '').split('-')
+        if match[0]:
+            byte1 = int(match[0])
+        if len(match) == 2 and match[1]:
+            byte2 = int(match[1])
+
+        length = size - byte1 if byte2 is None else byte2 - byte1 + 1
+        with open(file_path, 'rb') as f:
+            f.seek(byte1)
+            data = f.read(length)
+
+        response = Response(data, 206, mimetype='application/octet-stream',
+                            content_type='application/octet-stream')
+        response.headers.add('Content-Range', f'bytes {byte1}-{byte1+length-1}/{size}')
+        response.headers.add('Accept-Ranges', 'bytes')
+        return response
+    except Exception as e:
+        return abort(500, str(e))
+
+
 # ----------------------------------------- System Endpoints -----------------------------------------
 
 
@@ -236,6 +276,7 @@ def TextModeration():
     profane_sentence = data["sentence"]
     mask_character = data["mask_character"]
     custom_words = data["custom_words"]
+    project_name = data["project_name"]
 
     r = tpf.textProfanityFilteration(
         profane_sentence=profane_sentence,
@@ -254,19 +295,26 @@ def TextModeration():
         input_content=profane_sentence,
         mask_character=mask_character,
         output_content=output_content,
+        project_name=project_name,
     )
 
     if input_content_id is not None:
-        print(f"Input content id is: {input_content_id}")
+
         for x in custom_words:  # Inserting custom words into the database
-            DaOPS.insert_custom_words(input_content_id=input_content_id, custom_word=x)
+            try:
+                DaOPS.insert_custom_words(input_content_id=input_content_id, custom_word=x)
+            except Exception as e:
+                print(f"Error from app.py in inserting custom words is: {e}")
         for x in r:  # Inserting processed text into the database
-            DaOPS.insert_processed_text(
-                input_content_id=input_content_id,
-                original_word=x["OriginalWord"],
-                is_flagged=x["IsProfane"],
-                filtered_word=x["FilteredWord"],
-            )
+            try:
+                DaOPS.insert_processed_text(
+                    input_content_id=input_content_id,
+                    original_word=x["OriginalWord"],
+                    is_flagged=x["IsProfane"],
+                    filtered_word=x["FilteredWord"],
+                )
+            except Exception as e:
+                print(f"Error from app.py in inserting_processed_text is: {e}")
         return jsonify(r), 200
     else:
         return jsonify({"error": "Internal server error"}), 500
@@ -295,6 +343,9 @@ def AudioModeration():
     mask_char = request.form.get(
         "mask_char", "*"
     )  # Getting the mask character from the request form
+    project_name = request.form.get(
+        "project_name", str(int(time.time()))
+    )
     custom_bad_words = request.form.getlist(
         "words"
     )  # Getting the custom words from the request form
@@ -323,6 +374,7 @@ def AudioModeration():
         input_content=filepath,
         mask_character=mask_char,
         output_content=output_path,
+        project_name=project_name,
     )
 
     if input_content_id is not None:
@@ -366,6 +418,10 @@ def ImageModeration():
         return jsonify({"error": "Invalid token"}), 401
 
     user_id = decoded_token["user_id"]  # Getting the user id from the token
+
+    project_name = request.form.get(
+        "project_name", str(int(time.time()))
+    )
 
     try:
         # Check if image file is provided
@@ -417,23 +473,44 @@ def ImageModeration():
             input_content=filepath,
             mask_character="",
             output_content=blured_image_path,
+            project_name=project_name,
         )
 
         if input_content_id is not None:
             for x in r["harmful_detected"]:
-                if DaOPS.insert_processed_image(
+                if (
+                    DaOPS.insert_processed_image(
+                        input_content_id=input_content_id,
+                        detected_content=x,
+                        is_flagged=r["isFlagged"],
+                    )
+                    != 1
+                ):
+                    return (
+                        jsonify(
+                            {
+                                "error": "Internal server error while inserting data in processed image table"
+                            }
+                        ),
+                        500,
+                    )
+
+            if (
+                DaOPS.insert_visual_content_features(
                     input_content_id=input_content_id,
-                    detected_content=x,
-                    is_flagged=r["isFlagged"]
-                ) != 1:
-                    return jsonify({"error": "Internal server error while inserting data in processed image table"}), 500
-            
-            if DaOPS.insert_visual_content_features(
-                input_content_id=input_content_id,
-                blur_radius=str(blur_radius),
-                fps=0
-            ) != 1:
-                return jsonify({"error": "Internal server error while inseting data in insert_visual_content_features table"}), 500
+                    blur_radius=str(blur_radius),
+                    fps=0,
+                )
+                != 1
+            ):
+                return (
+                    jsonify(
+                        {
+                            "error": "Internal server error while inseting data in insert_visual_content_features table"
+                        }
+                    ),
+                    500,
+                )
             return jsonify(r), 200
         else:
             return jsonify({"error": "Internal server error"}), 500
@@ -447,13 +524,30 @@ def ImageModeration():
 @app.route("/videomoderation", methods=["POST"])
 def VideoModeration():
     try:
-        start_time = time.time()
+        auth_token = request.headers.get(
+            "Authorization"
+        )  # Getting the auth token from the request header
+        if not auth_token:
+            return jsonify({"error": "Unauthorized"}), 401
+
+        decoded_token = utils.verify_token(auth_token)  # Verifying the token
+        if decoded_token == "Token expired":
+            return jsonify({"error": "Token expired"}), 401
+        elif decoded_token == "Invalid token":
+            return jsonify({"error": "Invalid token"}), 401
+
+        user_id = decoded_token["user_id"]  # Getting the user id from the token
+
         # Check if image file is provided
         if "video" not in request.files:
             return jsonify({"error": "No video file provided"}), 400
 
         video_file = request.files["video"]
         filename = secure_filename(video_file.filename)
+
+        project_name = request.form.get(
+        "project_name", str(int(time.time()))
+    )
 
         # Validate file extension
         if not allowed_video_file(filename):
@@ -486,7 +580,7 @@ def VideoModeration():
         words = request.form.getlist("custom_words")
 
         # Save uploaded video
-        input_file_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
+        input_file_path = os.path.join("storage/files", filename)
         video_file.save(input_file_path)
 
         # Using VideoProfanityDetection class for detection
@@ -494,11 +588,45 @@ def VideoModeration():
             input_video=input_file_path, custom_words=words, mask_char=mask_char
         )
 
-        return jsonify(vpf.video_moderation(blur_video=True))
+        r = vpf.video_moderation(blur_video=True)
+
+        DaOPS = DatabaseOPS()
+        input_content_id = DaOPS.insert_input_content(
+            user_id=user_id,
+            content_type="VIDEO",
+            input_content=input_file_path,
+            mask_character=mask_char,
+            output_content=r["moderated_video_path"],
+            project_name=project_name,
+        )
+
+        for x in r["text_moderated_data"]:
+            DaOPS.insert_processed_audio(
+                input_content_id=input_content_id,
+                start_time=x["Start"],
+                end_time=x["End"],
+                is_flagged=x["IsProfane"],
+                original_word=x["OriginalWord"],
+                filtered_word=x["FilteredWord"],
+            )
+
+        for x in r["image_detections"]:
+            primary_key = DaOPS.insert_processed_video_detection(
+                input_content_id=input_content_id,
+                start_second=x["second"],
+                end_second=x["second"] + 1,
+            )
+            if len(x["harmful_detected"]) > 0:
+                for detected_content in x["harmful_detected"]:
+                    DaOPS.insert_video_content_detections(
+                        processed_video_id=str(primary_key),
+                        detected_content=detected_content,
+                    )
+        return jsonify(r), 200
 
     except Exception as e:
         print(f"Internal error occured. Error is:\n {e}")
-        return 500
+        return jsonify(f"Internal error occured. Error is:\n {e}"), 200
 
 
 if __name__ == "__main__":

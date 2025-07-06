@@ -76,7 +76,7 @@ class VideoProfanityDetection:
         import subprocess
 
         input_video = self.input_video
-        output_path = f"storage/output/{int(time.time())}.mp4"  # Output video path
+        output_path = f"storage/files/{str(int(time.time()))}.mp4"  # Output video path
 
         # Build ffmpeg filter for selective blur using boxblur
         blur_exprs = []
@@ -134,7 +134,7 @@ class VideoProfanityDetection:
         moderated_audio_output_path, text_profanity_data = (
             self.audio.audioProfanityFilteration(
                 audio_path=audio_path,
-                output_path=f"storage/audio/{str(int(time.time()))}.mp3",
+                output_file_name=f"{str(int(time.time()))}.mp3",
                 mask_char=self.mask_character,
                 custom_words=self.custom_words,
             )
@@ -157,8 +157,15 @@ class VideoProfanityDetection:
 
         # Apply blur to flagged seconds and combine with moderated audio
         final_moderated_output = self.blur_and_audio(
-            blur_seconds=seconds_to_blur, audio_path=moderated_audio_output_path
+            blur_seconds=seconds_to_blur, audio_path="storage/files/"+moderated_audio_output_path
         )
+
+        if final_moderated_output is None:
+            print("Error: Failed to process video with ffmpeg.")
+            return {"error": "Failed to process video"}
+
+
+        print("final moderated output printed by me is:", final_moderated_output)
 
         # Prepare final moderation data dictionary
         final_data = {

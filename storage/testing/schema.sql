@@ -2,7 +2,7 @@ create table users
 (
     user_id     bigint          primary key,
     user_name   varchar(200),
-    email_id    varchar(200),
+    email_id    varchar(200) unique,
     user_password varchar(200),
     auth_token  varchar(4000),
     refresh_token varchar(4000),
@@ -67,9 +67,15 @@ create table processed_video
 (
     processed_video_id      bigint      primary key,
     input_content_id        bigint      references              input_contents(input_content_id),
-    start_frame             bigint,
-    end_frame               bigint,
+    start_second             bigint,
+    end_second               bigint,
+    
+)
+
+create table video_content_detections
+(
+    video_content_detections_id bigint primary key,
+    processed_video_id      bigint      references              processed_video_detections(processed_video_id),
     detected_content        varchar(4000),
-    is_flagged              varchar(5)              -- true , false
 )
 
