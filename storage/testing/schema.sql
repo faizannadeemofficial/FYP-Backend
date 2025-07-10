@@ -13,6 +13,7 @@ create table input_contents
 (
     input_content_id    bigint      primary key,
     user_id             bigint      references      users(user_id),
+    project_name        varchar(200),  -- Name of the projec
     content_type        varchar(20),  -- TEXT, AUDIO, VIDEO , IMAGE
     input_content       varchar(4000),
     mask_character      varchar(50),             -- 😈
@@ -69,7 +70,6 @@ create table processed_video
     input_content_id        bigint      references              input_contents(input_content_id),
     start_second             bigint,
     end_second               bigint,
-    
 )
 
 create table video_content_detections

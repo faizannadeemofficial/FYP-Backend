@@ -76,7 +76,8 @@ class VideoProfanityDetection:
         import subprocess
 
         input_video = self.input_video
-        output_path = f"storage/files/{str(int(time.time()))}.mp4"  # Output video path
+        output_filename = str(int(time.time())) + ".mp4"
+        output_path = f"storage/files/{output_filename}"  # Output video path
 
         # Build ffmpeg filter for selective blur using boxblur
         blur_exprs = []
@@ -117,7 +118,7 @@ class VideoProfanityDetection:
             print(f"ffmpeg failed: {e}")
             return None
 
-        return output_path  # Return path to processed video
+        return output_filename  # Return path to processed video
 
     def video_moderation(self, blur_video: bool):
         """

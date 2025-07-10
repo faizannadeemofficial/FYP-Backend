@@ -21,6 +21,7 @@ class AudioProfanityFilter:
 
         for segment in segments:
             for word in segment.words:
+                word.word = self.tpf.convert_leetspeak(word.word)  # Convert leetspeak to normal text
                 if self.textpf.isGoodWord(word.word.lower()):
                     moderated_json.append(
                         {

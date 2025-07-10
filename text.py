@@ -23,6 +23,9 @@ class TextProfanityFilter:
             "#": "h",
             "@": "a",
             "<": "c",
+            ",": "",
+            ".": "",
+            "?": ""
         }
 
         # All Good words
@@ -41,6 +44,7 @@ class TextProfanityFilter:
             "being",
             # Pronouns
             "I",
+            "you",
             "you",
             "he",
             "she",
@@ -109,6 +113,20 @@ class TextProfanityFilter:
             # Others
             "man",
             "fan",
+            "get",
+            "come",
+            "ever",
+            "go",
+            "make",
+            "never",
+            "see",
+            "say",
+            "take",
+            "want",
+            "like",
+            "me",
+            "little",
+            "big",
         ]
 
         # All Bad Words
@@ -117,6 +135,7 @@ class TextProfanityFilter:
             "anal",
             "anus",
             "areole",
+            "MF",
             "arian",
             "arrse",
             "arse",
@@ -963,6 +982,7 @@ class TextProfanityFilter:
         converted = text.lower()
         for leet, normal in self.replacements.items():
             converted = converted.replace(leet, normal)
+            print(converted)
 
         return converted
 
@@ -1043,37 +1063,36 @@ class TextProfanityFilter:
         if len(self.moderated_json) > 0:
             self.moderated_json = []  # Making the list empty
 
-        profane_words = profane_sentence.split()
-
         normal_text = self.convert_leetspeak(profane_sentence)
 
-        # Process each word in the normalized text
-        for word in normal_text.split():
-            if self.isGoodWord(word.lower()):
-                self.moderated_json.append(
-                    {
-                        "OriginalWord": word,
-                        "IsProfane": False,
-                        "FilteredWord": word,
-                    }
-                )
-            # Check if word is profane using ML model or exists in bad words list
-            elif self.predict_text(text=word) or self.isBadWord(
-                word=word, custom_words=custom_words
-            ):
-                # If profane, mask the word and mark as profane
-                self.moderated_json.append(
-                    {
-                        "OriginalWord": word,
-                        "IsProfane": True,
-                        "FilteredWord": len(word) * mask_char,
-                    }
-                )
-            else:
-                # If not profane, keep original word and mark as clean
-                self.moderated_json.append(
-                    {"OriginalWord": word, "IsProfane": False, "FilteredWord": word}
-                )
-
+        if self.predict_text(text=normal_text):
+            print("ander warr gya")
+            # Process each word in the normalized text
+            for word in normal_text.split():
+                if self.isGoodWord(word.lower()):
+                    self.moderated_json.append(
+                        {
+                            "OriginalWord": word,
+                            "IsProfane": False,
+                            "FilteredWord": word,
+                        }
+                    )
+                # Check if word is profane using ML model or exists in bad words list
+                elif self.predict_text(text=word) or self.isBadWord(
+                    word=word, custom_words=custom_words
+                ):
+                    # If profane, mask the word and mark as profane
+                    self.moderated_json.append(
+                        {
+                            "OriginalWord": word,
+                            "IsProfane": True,
+                            "FilteredWord": len(word) * mask_char,
+                        }
+                    )
+                else:
+                    # If not profane, keep original word and mark as clean
+                    self.moderated_json.append(
+                        {"OriginalWord": word, "IsProfane": False, "FilteredWord": word}
+                    )
         # Return the list of processed words with their profanity status
         return self.moderated_json

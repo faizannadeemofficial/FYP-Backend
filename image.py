@@ -35,9 +35,13 @@ class ImageProfanityFilter:
         # Apply Gaussian blur
         blurred_image = image.filter(ImageFilter.GaussianBlur(radius=blur_radius))
 
+        # Convert to RGB if needed (JPEG does not support alpha channel)
+        if blurred_image.mode in ("RGBA", "LA"):
+            blurred_image = blurred_image.convert("RGB")
+
         # Save the output
         output_path = f"{int(time.time())}.jpg"
-        blurred_image.save("storage/files/"+output_path)
+        blurred_image.save("storage/files/" + output_path)
 
         return output_path
 
@@ -58,15 +62,3 @@ class ImageProfanityFilter:
             "isFlagged": True if len(harmful) > 0 else False,
             "harmful_detected": harmful,
         }
-
-    def pretty_print(self, result):
-        print("\n--- Harmful Content Probabilities ---")
-        for label, prob in result["all_categories"]:
-            print(f"{label}: {prob:.4f}")
-
-        if result["harmful_detected"]:
-            print("\n⚠️ Potentially harmful content detected:")
-            for label, prob in result["harmful_detected"]:
-                print(f" - {label} (Confidence: {prob:.2%})")
-        else:
-            print("\n✅ No harmful content detected.")

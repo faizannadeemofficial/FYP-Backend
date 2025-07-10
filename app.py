@@ -60,26 +60,6 @@ def Main():
     return "<h1>Content Moderation APIs are live...</h1>"
 
 
-@app.route("/files/<path:filename>", methods=["POST"])
-def serve_custom_static(filename):
-    auth_token = request.headers.get(
-        "Authorization"
-    )  # Getting the auth token from the request header
-    if not auth_token:
-        return jsonify({"error": "Unauthorized"}), 401
-
-    decoded_token = utils.verify_token(auth_token)  # Verifying the token
-    if decoded_token == "Token expired":
-        return jsonify({"error": "Token expired"}), 401
-    elif decoded_token == "Invalid token":
-        return jsonify({"error": "Invalid token"}), 401
-
-    try:
-        return send_from_directory(STATIC_FOLDER, filename)
-    except FileNotFoundError:
-        return 400  # Or handle the error as you see fit
-
-
 # ----------------------------------------- Authentication Endpoints -----------------------------------------
 
 
@@ -285,8 +265,11 @@ def TextModeration():
     )
 
     output_content = ""
-    for x in r:
-        output_content += x["FilteredWord"] + " "
+    if len(r) == 0:
+        return jsonify({"message": "No Profanity Detected"}), 200
+    else:
+        for x in r:
+            output_content += x["FilteredWord"] + " "
 
     DaOPS = DatabaseOPS()
     input_content_id = DaOPS.insert_input_content(
@@ -315,6 +298,14 @@ def TextModeration():
                 )
             except Exception as e:
                 print(f"Error from app.py in inserting_processed_text is: {e}")
+                return (
+                    jsonify(
+                        {
+                            "error": "Internal server error while inserting data in processed text table"
+                        }
+                    ),
+                    500,
+                )
         return jsonify(r), 200
     else:
         return jsonify({"error": "Internal server error"}), 500
@@ -611,7 +602,7 @@ def VideoModeration():
             )
 
         for x in r["image_detections"]:
-            primary_key = DaOPS.insert_processed_video_detection(
+            primary_key = DaOPS.insert_processed_video(
                 input_content_id=input_content_id,
                 start_second=x["second"],
                 end_second=x["second"] + 1,
@@ -628,6 +619,164 @@ def VideoModeration():
         print(f"Internal error occured. Error is:\n {e}")
         return jsonify(f"Internal error occured. Error is:\n {e}"), 200
 
+
+# ================================================================== Retrieval APIs ====================================================================
+
+# Retrieve all input content for a user
+@app.route("/api/retrieve/", methods=["POST"])
+def retrieve_input_content():
+    auth_token = request.headers.get("Authorization")
+    if not auth_token:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    decoded_token = utils.verify_token(auth_token)
+    if decoded_token == "Token expired":
+        return jsonify({"error": "Token expired"}), 401
+    elif decoded_token == "Invalid token":
+        return jsonify({"error": "Invalid token"}), 401
+
+    user_id = decoded_token["user_id"]
+    DaOPS = DatabaseOPS()
+    data = DaOPS.get_input_content(user_id=[user_id])
+
+    if data is not None:
+        return jsonify(data), 200
+    else:
+        return jsonify({"error": "Internal server error"}), 500
+    
+# This endpoint retrieves processed audio data based on input content ID.
+@app.route("/api/retrieve/processed_text", methods=["POST"])
+def retrieve_processed_text():
+    """ Retrieves processed text data based on input content ID.
+    Expects a JSON body with "input_content_id" as a list.
+    Returns processed text data or an error message.
+    """
+
+    print("debug 0")
+    auth_token = request.headers.get("Authorization")
+    if not auth_token:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    decoded_token = utils.verify_token(auth_token)
+    if decoded_token == "Token expired":
+        return jsonify({"error": "Token expired"}), 401
+    elif decoded_token == "Invalid token":
+        return jsonify({"error": "Invalid token"}), 401
+
+    user_id = decoded_token["user_id"]
+    data = request.get_json()
+    input_content_id = data.get("input_content_id", [])
+    print(f"Input Content ID: {input_content_id} and its type is {type(input_content_id)}")
+
+    print("debug 1")
+
+    DaOPS = DatabaseOPS()
+    processed_text_data = DaOPS.get_processed_text(
+        input_content_id=input_content_id,
+    )
+    print(f"Processed Text Data: {processed_text_data}")
+
+    if processed_text_data is not None:
+        print("debug 2")
+        return jsonify(processed_text_data), 200
+    else:
+        return jsonify({"error": "Internal server error"}), 500
+
+# This endpoint retrieves processed audio data based on input content ID.
+@app.route("/api/retrieve/processed_audio", methods=["POST"])
+def retrieve_processed_audio():
+    """ Retrieves processed audio data based on input content ID.
+    Expects a JSON body with "input_content_id" as a list.
+    Returns processed audio data or an error message.
+    """
+
+    auth_token = request.headers.get("Authorization")
+    if not auth_token:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    decoded_token = utils.verify_token(auth_token)
+    if decoded_token == "Token expired":
+        return jsonify({"error": "Token expired"}), 401
+    elif decoded_token == "Invalid token":
+        return jsonify({"error": "Invalid token"}), 401
+
+    user_id = decoded_token["user_id"]
+    data = request.get_json()
+    input_content_id = data.get("input_content_id")
+
+    DaOPS = DatabaseOPS()
+    processed_audio_data = DaOPS.get_processed_audio(
+        input_content_id=input_content_id,
+    )
+
+    if processed_audio_data is not None:
+        return jsonify(processed_audio_data), 200
+    else:
+        return jsonify({"error": "Internal server error"}), 500
+
+# This endpoint retrieves processed image data based on input content ID.
+@app.route("/api/retrieve/processed_image", methods=["POST"])
+def retrieve_processed_image():
+    """ Retrieves processed image data based on input content ID.
+    Expects a JSON body with "input_content_id" as a list.
+    Returns processed image data or an error message.
+    """
+
+    auth_token = request.headers.get("Authorization")
+    if not auth_token:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    decoded_token = utils.verify_token(auth_token)
+    if decoded_token == "Token expired":
+        return jsonify({"error": "Token expired"}), 401
+    elif decoded_token == "Invalid token":
+        return jsonify({"error": "Invalid token"}), 401
+
+    user_id = decoded_token["user_id"]
+    data = request.get_json()
+    input_content_id = data.get("input_content_id")
+
+    DaOPS = DatabaseOPS()
+    processed_image_data = DaOPS.get_processed_image(
+        input_content_id=input_content_id,
+    )
+
+    if processed_image_data is not None:
+        return jsonify(processed_image_data), 200
+    else:
+        return jsonify({"error": "Internal server error"}), 500
+    
+# This endpoint retrieves processed video data based on input content ID.
+@app.route("/api/retrieve/processed_video", methods=["POST"])
+def retrieve_processed_video():
+    """ Retrieves processed video data based on input content ID.
+    Expects a JSON body with "input_content_id" as a list.
+    Returns processed video data or an error message.
+    """
+
+    auth_token = request.headers.get("Authorization")
+    if not auth_token:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    decoded_token = utils.verify_token(auth_token)
+    if decoded_token == "Token expired":
+        return jsonify({"error": "Token expired"}), 401
+    elif decoded_token == "Invalid token":
+        return jsonify({"error": "Invalid token"}), 401
+
+    user_id = decoded_token["user_id"]
+    data = request.get_json()
+    input_content_id = data.get("input_content_id")
+
+    DaOPS = DatabaseOPS()
+    processed_video_data = DaOPS.get_processed_video(
+        input_content_id=input_content_id,
+    )
+
+    if processed_video_data is not None:
+        return jsonify(processed_video_data), 200
+    else:
+        return jsonify({"error": "Internal server error"}), 500
 
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=5000)
