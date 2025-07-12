@@ -982,7 +982,6 @@ class TextProfanityFilter:
         converted = text.lower()
         for leet, normal in self.replacements.items():
             converted = converted.replace(leet, normal)
-            print(converted)
 
         return converted
 
@@ -1066,7 +1065,6 @@ class TextProfanityFilter:
         normal_text = self.convert_leetspeak(profane_sentence)
 
         if self.predict_text(text=normal_text):
-            print("ander warr gya")
             # Process each word in the normalized text
             for word in normal_text.split():
                 if self.isGoodWord(word.lower()):

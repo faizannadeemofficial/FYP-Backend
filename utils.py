@@ -9,7 +9,7 @@ SECRET_KEY = os.getenv("SECRET_KEY")  # Keep it safe (e.g., in .env file)
 ACCESS_TOKEN_EXPIRE_MINUTES = 1440
 REFRESH_TOKEN_EXPIRE_DAYS = 30
 
-
+# Generate Auth token
 def authentication_token(user_id: str, user_email: str, user_name: str):
     "Generate access token(JWT)"
     now = datetime.datetime.utcnow()
@@ -26,7 +26,7 @@ def authentication_token(user_id: str, user_email: str, user_name: str):
 
     return access_token
 
-
+# Generate refresh token
 def refresh_token(user_id: str, user_email: str, user_name: str):
     "Generate refresh token(JWT)"
     now = datetime.datetime.utcnow()
@@ -43,7 +43,7 @@ def refresh_token(user_id: str, user_email: str, user_name: str):
 
     return refresh_token
 
-
+# verify_tokens
 def verify_token(token):
     "Validates JWT token"
     try:
