@@ -437,3 +437,55 @@ class DatabaseOPS:
         except Exception as e:
             print(f"Error in set_forget_token is: {e}")
             return e
+
+    def get_forget_token(self, email:str):
+        """
+        Retrieves the 'forget_token' for a given email.
+        """
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute(
+                "SELECT forget_token FROM users WHERE email_id = %s", (email,)
+            )
+            result = cursor.fetchone()
+            cursor.close()
+            if result:
+                return result[0]
+            else:
+                return None
+        except Exception as e:
+            print(f"Error in get_forget_token is: {e}")
+            return e
+    
+    def new_password(self, email: str, forget_token: str, new_password: str):
+        """
+        Updates the 'user_password' field for a user.
+        """
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute(
+                "UPDATE users SET user_password = %s WHERE email_id = %s and forget_token = %s",
+                (new_password, email, forget_token),
+            )
+            self.conn.commit()
+            cursor.close()
+            return 1
+        except Exception as e:
+            print(f"Error in new_password is: {e}")
+            return e
+
+    def delete_forget_token(self, email: str):
+        """
+        Deletes the 'forget_token' for a given email.
+        """
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute(
+                "UPDATE users SET forget_token = NULL WHERE email_id = %s", (email,)
+            )
+            self.conn.commit()
+            cursor.close()
+            return 1
+        except Exception as e:
+            print(f"Error in delete_forget_token is: {e}")
+            return e

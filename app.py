@@ -13,6 +13,9 @@ from image import ImageProfanityFilter
 from video import VideoProfanityDetection
 from database import DatabaseOPS
 import utils
+from mailer import send_mailtrap_email
+import random
+import string
 
 app = Flask(__name__)
 CORS(app)
@@ -58,6 +61,49 @@ def allowed_video_file(filename):
 @app.route("/")
 def Main():
     return "<h1>Content Moderation APIs are live...</h1>"
+
+# Mail sender endpoint
+@app.route('/send_otp', methods=['POST'])
+def send_mailtrap():
+    data = request.get_json()
+    to_email = data.get("to_email")
+    subject = data.get("subject")
+    text = data.get("text")
+    code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6)) # Generate a random 6-character code
+    if not to_email or not subject or not text:
+        return jsonify({"success": False, "error": "Missing required fields"}), 400
+    DaOPS = DatabaseOPS()
+    DaOPS.set_forget_token(email=to_email, forget_token=code)  # Set forget token in the database
+    result = send_mailtrap_email(to_email, otp=code, subject=subject) # Send email using Mailtrap
+    status_code = 200 if result.get("success") else 500
+    return jsonify(result), status_code
+
+@app.route('/verify_otp', methods=['POST'])
+def verify_otp():
+    data = request.get_json()
+    to_email = data.get("to_email")
+    otp = data.get("otp")
+    new_pwd = data.get("new_password")
+    
+    if not to_email or not otp:
+        return jsonify({"success": False, "error": "Missing required fields"}), 400
+    
+    DaOPS = DatabaseOPS()
+    stored_otp = DaOPS.get_forget_token(email=to_email)
+    
+    if stored_otp is None:
+        return jsonify({"success": False, "error": "No OTP found for this email"}), 404
+    
+    if stored_otp == otp:
+        if DaOPS.new_password(email=to_email, forget_token=otp, new_password=new_pwd) == 1:
+            if DaOPS.delete_forget_token(email=to_email) == 1:
+                return jsonify({"success": True, "message": "Password updated successfully"}), 200
+            else:
+                return jsonify({"success": False, "error": "Error deleting OTP"}), 500
+        else:
+            return jsonify({"success": False, "error": "Error updating password"}), 500
+    else:
+        return jsonify({"success": False, "error": "Invalid OTP"}), 400
 
 
 # ----------------------------------------- Authentication Endpoints -----------------------------------------

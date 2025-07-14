@@ -6,6 +6,7 @@ create table users
     user_password varchar(200),
     auth_token  varchar(4000),
     refresh_token varchar(4000),
+    forget_token varchar(20),
     creation_date   date
 )
 
