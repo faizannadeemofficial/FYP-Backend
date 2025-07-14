@@ -16,9 +16,9 @@ import utils
 
 app = Flask(__name__)
 CORS(app)
-limiter = Limiter(
-    get_remote_address, app=app, default_limits=["200 per day", "50 per hour"]
-)  # Limiting the user request
+# limiter = Limiter(
+#     get_remote_address, app=app, default_limits=["200 per day", "50 per hour"]
+# )  # Limiting the user request
 
 # print(f"Flask expects static files in: {os.path.abspath(app.static_folder)}")
 
@@ -65,7 +65,7 @@ def Main():
 
 # Register Endpoint
 @app.route("/api/auth/register", methods=["POST"])
-@limiter.limit("5 per minute")  # Limit to 5 login attempts per minute per IP
+# @limiter.limit("5 per minute")  # Limit to 5 login attempts per minute per IP
 def register():
     data = request.get_json()
     username = data["username"]
@@ -89,7 +89,7 @@ def register():
 
 # Login Endpoint
 @app.route("/api/auth/login", methods=["POST"])
-@limiter.limit("5 per minute")  # Limit to 5 login attempts per minute per IP
+# @limiter.limit("5 per minute")  # Limit to 5 login attempts per minute per IP
 def login():
     data = request.get_json()
     email = data["email_id"]
@@ -145,7 +145,7 @@ def login():
 
 
 @app.route("/api/auth/refresh_tokens", methods=["POST"])
-@limiter.limit("5 per minute")  # Limit to 5 attempts per minute per IP
+# @limiter.limit("5 per minute")  # Limit to 5 attempts per minute per IP
 def refresh_tokens():
     data = request.get_json()
     refresh_token = data["refresh_token"]
@@ -180,7 +180,7 @@ def refresh_tokens():
 
 
 @app.route("/api/auth/logout", methods=["POST"])
-@limiter.limit("5 per minute")  # Limit to 5 attempts per minute per IP
+# @limiter.limit("5 per minute")  # Limit to 5 attempts per minute per IP
 def logout():
     data = request.get_json()
     refresh_token = data["refresh_token"]
@@ -189,9 +189,33 @@ def logout():
     if DaOPS.logout(refresh_token=refresh_token) == 1:
         return jsonify({"message": "Logged out successfully."}), 200
     else:
-        return jsonify({"error": "Error occured while logging out."})
+        return jsonify({"error": "Error occured while logging out."}), 500
 
+@app.route("/api/auth/forget_password", methods=["POST"])
+def forget_password():
+    data = request.get_json()
+    email = data["email_id"]
 
+    DaOPS = DatabaseOPS()
+    user_data = DaOPS.get_user_data(email_id=email)
+
+    if user_data is None:
+        return jsonify({"error": "User not found"}), 404
+
+    # Generate a forget token
+    forget_token = utils.forget_password_token(user_id=user_data[0], email=email)
+
+    forget_token_status = DaOPS.set_forget_token(email=email, forget_token=forget_token)
+    send_email_code = utils.send_email_code(to_email=email, code=forget_token)
+    print(f"Forget token status is: {forget_token_status}")
+    print(f"Forget token is: {forget_token} and its type is {type(forget_token)}")
+
+    if forget_token_status != 1:
+        return jsonify({"error": "Error while generating forget token"}), 500
+    if send_email_code is False:
+        return jsonify({"error": "Error while sending email code"}), 500
+
+    return jsonify({"message": "Forget token generated and sent to your email."}), 200
 
 
 # Stream Media File
@@ -309,6 +333,81 @@ def TextModeration():
         return jsonify(r), 200
     else:
         return jsonify({"error": "Internal server error"}), 500
+
+# Text File Moderation Endpoint
+@app.route("/txtmoderation", methods=["POST"])
+def TxtFileModeration():
+    auth_token = request.headers.get("Authorization")
+    if not auth_token:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    decoded_token = utils.verify_token(auth_token)
+    if decoded_token == "Token expired":
+        return jsonify({"error": "Token expired"}), 401
+    elif decoded_token == "Invalid token":
+        return jsonify({"error": "Invalid token"}), 401
+
+    user_id = decoded_token["user_id"]
+
+    if "file" not in request.files:
+        return jsonify({"error": "No file provided"}), 400
+
+    txt_file = request.files["file"]
+    filename = secure_filename(txt_file.filename)
+    if not filename.lower().endswith(".txt"):
+        return jsonify({"error": "Only .txt files are allowed"}), 400
+
+    mask_char = request.form.get("mask_char", "*")
+    custom_words = request.form.getlist("custom_words")
+    project_name = request.form.get("project_name", str(int(time.time())))
+
+    # Save uploaded file
+    input_path = os.path.join("storage/uploads", filename)
+    txt_file.save(input_path)
+
+    # Moderate each line
+    moderated_lines = []
+    report = []
+    with open(input_path, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            result = tpf.textProfanityFilteration(
+                profane_sentence=line,
+                mask_char=mask_char,
+                custom_words=custom_words,
+            )
+            # Join filtered words for the moderated line
+            moderated_line = " ".join([x["FilteredWord"] for x in result])
+            moderated_lines.append(moderated_line)
+            report.append(result)
+
+    # Save moderated file
+    moderated_filename = f"{int(time.time())}.txt"
+    moderated_path = os.path.join("storage/files", moderated_filename)
+    with open(moderated_path, "w", encoding="utf-8") as f:
+        for line in moderated_lines:
+            f.write(line + "\n")
+
+    # Optionally, insert into DB (similar to other endpoints)
+    DaOPS = DatabaseOPS()
+    input_content_id = DaOPS.insert_input_content(
+        user_id=user_id,
+        content_type="TEXT_FILE",
+        input_content=input_path,
+        mask_character=mask_char,
+        output_content=moderated_path,
+        project_name=project_name,
+    )
+
+    # Prepare moderated text for JSON (add \n at end of each line)
+    moderated_text = "\n".join(moderated_lines) + "\n" if moderated_lines else ""
+
+    # Return download link and report
+    return jsonify({
+        "moderated_file_path": moderated_filename,
+        # "moderated_text": moderated_text,
+        "report": report
+    }), 200
 
 
 # Audio Moderation Endpoint
@@ -651,8 +750,6 @@ def retrieve_processed_text():
     Expects a JSON body with "input_content_id" as a list.
     Returns processed text data or an error message.
     """
-
-    print("debug 0")
     auth_token = request.headers.get("Authorization")
     if not auth_token:
         return jsonify({"error": "Unauthorized"}), 401
@@ -668,8 +765,6 @@ def retrieve_processed_text():
     input_content_id = data.get("input_content_id", [])
     print(f"Input Content ID: {input_content_id} and its type is {type(input_content_id)}")
 
-    print("debug 1")
-
     DaOPS = DatabaseOPS()
     processed_text_data = DaOPS.get_processed_text(
         input_content_id=input_content_id,
@@ -677,7 +772,6 @@ def retrieve_processed_text():
     print(f"Processed Text Data: {processed_text_data}")
 
     if processed_text_data is not None:
-        print("debug 2")
         return jsonify(processed_text_data), 200
     else:
         return jsonify({"error": "Internal server error"}), 500

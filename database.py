@@ -17,6 +17,8 @@ class DatabaseOPS:
             user=os.getenv("DB_USER"),
             password=os.getenv("DB_PASSWORD"),
             database=os.getenv("DB_NAME"),
+            charset='utf8mb4',
+            use_unicode=True
         )
         self.cursor = self.conn.cursor()
 
@@ -306,7 +308,6 @@ class DatabaseOPS:
                 (input_content_id[0],),
             )
             processed_text = cursor.fetchall()
-            print("database.py: debug 1")
             cursor.close()
         except Exception as e:
             print(f"Error in get_processed_text is: {e}")
@@ -319,7 +320,6 @@ class DatabaseOPS:
                 (input_content_id[0],)
             )
             custom_words_table_data = cursor.fetchall()
-            print("database.py: debug 2")
             custom_words = []
             for custom_word in custom_words_table_data:
                 custom_words.append(custom_word['custom_word'])
@@ -420,3 +420,20 @@ class DatabaseOPS:
                 "processed_video": processed_video_data,
             }
         return None
+    
+    def set_forget_token(self, email, forget_token):
+        """
+        Updates the 'forget_token' field for a user.
+        """
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute(
+                "UPDATE users SET forget_token = %s WHERE email_id = %s",
+                (forget_token, email),
+            )
+            self.conn.commit()
+            cursor.close()
+            return 1
+        except Exception as e:
+            print(f"Error in set_forget_token is: {e}")
+            return e

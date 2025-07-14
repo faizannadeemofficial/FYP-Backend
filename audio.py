@@ -41,7 +41,8 @@ class AudioProfanityFilter:
                         {
                             "OriginalWord": word.word,
                             "IsProfane": True,
-                            "FilteredWord": len(word.word) * mask_char,
+                            # "FilteredWord": len(word.word) * mask_char,
+                            "FilteredWord": 4 * mask_char,
                             "Start": word.start,
                             "End": word.end,
                         }

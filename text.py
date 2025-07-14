@@ -45,7 +45,6 @@ class TextProfanityFilter:
             # Pronouns
             "I",
             "you",
-            "you",
             "he",
             "she",
             "it",
@@ -1084,7 +1083,8 @@ class TextProfanityFilter:
                         {
                             "OriginalWord": word,
                             "IsProfane": True,
-                            "FilteredWord": len(word) * mask_char,
+                            "FilteredWord": 4 * mask_char,
+                            # "FilteredWord": len(word) * mask_char,
                         }
                     )
                 else:
